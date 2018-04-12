@@ -8,6 +8,8 @@
 ;;                      <a-programa (exp)>
 ;;  <expresion>     ::= <number>
 ;;                      <lit-exp (dato)>
+;;                  ::= <cadena>
+;;                      <cad-exp (dato)>
 ;;                  ::= <identificador>
 ;;                      <var-exp (id)>
 ;;                  ::= <primitiva> ({<expresion>}*(,))
@@ -32,7 +34,8 @@
   (number (digit (arbno digit)) number)
   (number ("-" digit (arbno digit)) number)
   (number (digit (arbno digit)"."digit (arbno digit))number)
-  (number ("-"digit (arbno digit)"."digit (arbno digit))number)))
+  (number ("-"digit (arbno digit)"."digit (arbno digit))number)
+  (cadena ("'" (arbno (or letter digit))  "'")symbol)))
 
 ;Especificación Sintáctica (gramática)
 ;En especificacionGramatical es donde vamos a indicar la forma en la cual se deben organizar la unidades definicada en la
@@ -45,6 +48,7 @@
   '(
     (programa (expresion) a-programa)
     (expresion (number) lit-exp)
+    (expresion (cadena) cad-exp)
     (expresion (identificador) var-exp)
     (expresion
      (primitiva "(" (separated-list expresion ",")")")
@@ -112,6 +116,7 @@
   (lambda (exp env)
     (cases expresion exp
       (lit-exp (datum) datum)
+      (cad-exp (cadena)cadena)
       (var-exp (id) (apply-env env id))
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
@@ -165,7 +170,7 @@
   (lambda (env sym)
     (cases environment env
       (empty-env-record ()
-                        (eopl:error 'apply-env "No binding for ~s" sym))
+                        (eopl:error "Error "sym" no existe" ))
       (extended-env-record (syms vals env)
                            (let ((pos (list-find-position sym syms)))
                              (if (number? pos)
