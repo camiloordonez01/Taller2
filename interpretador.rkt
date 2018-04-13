@@ -14,6 +14,8 @@
 ;;                      <var-exp (id)>
 ;;                  ::= <primitiva> ({<expresion>}*(,))
 ;;                      <primapp-exp (prim rands)>
+;;                  ::= <let> ({<identifier> = <expresion>}) <in> ({<expression>})
+;;                      <let-exp> (ids rands body)
 ;;  <primitive>     ::= + | - | * | 
 
 ;******************************************************************************************
@@ -50,12 +52,20 @@
     (expresion (number) lit-exp)
     (expresion (cadena) cad-exp)
     (expresion (identificador) var-exp)
+    (expresion ("falso") false-exp)
+    (expresion ("verdadero") true-exp)
     (expresion
      (primitiva "(" (separated-list expresion ",")")")
      primapp-exp)
+    (expresion ("local" (arbno identificador "=" expresion)"haga" expresion "fin") let-exp)
     (primitiva ("+") sum-prim)
     (primitiva ("-") rest-prim)
-    (primitiva ("*") mult-prim)))
+    (primitiva ("*") mult-prim)
+    (primitiva (">") mayor-prim)
+    (primitiva ("<") menor-prim)
+    (primitiva (">=") mayorq-prim)
+    (primitiva ("<=") menorq-prim)
+    (expresion ("[" (separated-list expresion ",")"]")list-exp)))
 
 ;Construidos automáticamente:
 
@@ -100,27 +110,41 @@
   (lambda (pgm)
     (cases programa pgm
       (a-programa (body)
-                 (eval-expression body (init-env))))))
+                 (eval-expression body (empty-env))))))
 
-; Ambiente inicial
-(define init-env
-  (lambda ()
-    (extend-env
-     '(i v x)
-     '(1 5 10)
-     (empty-env))))
+
 
 ;eval-expression: <expression> <enviroment> -> numero
 ; evalua la expresión en el ambiente de entrada
+
 (define eval-expression
   (lambda (exp env)
     (cases expresion exp
       (lit-exp (datum) datum)
       (cad-exp (cadena)cadena)
+      (true-exp ()'verdadero)
+      (false-exp ()'falso)
       (var-exp (id) (apply-env env id))
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
-                     (apply-primitive prim args)))))) 
+                     (apply-primitive prim args)))
+      (let-exp(ids rands body)
+              (let ((args (eval-rands rands env)))
+                (eval-expression body
+                                 (extend-env ids args env))))
+      (list-exp(rands)
+               (let ((args (eval-rands rands env)))
+                 (lista 'args))))))
+
+(define lista
+  (lambda (args)
+    (string-append "list(" list ")")))
+
+(define auxLista
+  (lambda (list args)
+    (if (null?  args)
+        (string-append "list(" list ")")
+        (auxLista (string-append  list " " (number->string (car args)))(cdr args)))))
 
 ; funciones auxiliares para aplicar eval-expression a cada elemento de una 
 ; lista de operandos (expresiones)
@@ -132,13 +156,44 @@
   (lambda (rand env)
     (eval-expression rand env)))
 
+(define suma
+  (lambda (primer lista)
+    (if (null? lista)
+        primer
+    (suma (+ primer (car lista))(cdr lista)))))
+
+(define resta
+  (lambda (primer lista)
+    (if (null? lista)
+        primer
+    (resta (- primer (car lista))(cdr lista)))))
+
+(define multiplicacion
+  (lambda (primer lista)
+    (if (null? lista)
+        primer
+    (multiplicacion (* primer (car lista))(cdr lista)))))
+
+(define comparacion
+  (lambda (op lista)
+    (if (= (length lista) 3)
+        (if (op(car lista)(cadr lista))
+            (if(op (cadr lista)(caddr lista))
+               'verdadero 'falso)
+            'falso)
+        (if (op(car lista)(cadr lista))
+            'verdadero 'falso))))
 ;apply-primitive: <primitiva> <list-of-expression> -> numero
 (define apply-primitive
   (lambda (prim args)
     (cases primitiva prim
-      (sum-prim () (+ (car args) (cadr args)))
-      (rest-prim () (- (car args) (cadr args)))
-      (mult-prim () (* (car args) (cadr args))))))
+      (sum-prim   () (suma (car args)(cdr args)))
+      (rest-prim  () (resta (car args) (cdr args)))
+      (mult-prim  () (multiplicacion (car args) (cdr args)))
+      (mayor-prim () (comparacion > args))
+      (menor-prim () (comparacion < args))
+      (mayorq-prim () (comparacion >= args))
+      (menorq-prim () (comparacion <= args)))))
 
 ;*******************************************************************************************
 ;Ambientes
